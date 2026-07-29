@@ -2,7 +2,7 @@ import streamlit as st
 import random
 import time
 import pandas as pd
-import requests # 파일 최상단에 추가
+import requests
 
 st.set_page_config(page_title="정렬 알고리즘 탐구 대시보드", layout="wide")
 
@@ -20,6 +20,8 @@ if "step_idx" not in st.session_state:
     st.session_state.step_idx = 0
 if "steps" not in st.session_state:
     st.session_state.steps = []
+if "calc_time_ms" not in st.session_state:
+    st.session_state.calc_time_ms = 0.0
 
 # ---------------------------------------------------------
 # 2. 정렬 알고리즘 및 단계(Step) 제너레이터
@@ -78,14 +80,13 @@ def generate_steps(arr, alg_type):
     steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [], "msg": "🎉 정렬이 완료되었습니다!"})
     return steps
 
-# 알고리즘별 파이썬 코드 정의
 PYTHON_CODES = {
     "버블 정렬": '''def bubble_sort(arr):
     n = len(arr)
     for i in range(n):
         for j in range(0, n - i - 1):
             if arr[j] > arr[j + 1]:
-                arr[j], arr[j + 1] = arr[j + 1], arr[j] # 교환
+                arr[j], arr[j + 1] = arr[j + 1], arr[j]
     return arr''',
     
     "선택 정렬": '''def selection_sort(arr):
@@ -95,7 +96,7 @@ PYTHON_CODES = {
         for j in range(i + 1, n):
             if arr[j] < arr[min_idx]:
                 min_idx = j
-        arr[i], arr[min_idx] = arr[min_idx], arr[i] # 최소값 위치로 교환
+        arr[i], arr[min_idx] = arr[min_idx], arr[i]
     return arr''',
     
     "삽입 정렬": '''def insertion_sort(arr):
@@ -117,6 +118,7 @@ st.sidebar.header("⚙️ 실험 데이터 및 조건 설정")
 data_size = st.sidebar.slider("데이터 개수 (N)", 5, 20, 8)
 data_state = st.sidebar.selectbox("데이터 상태", ["무작위 (Random)", "완전 역순 (Reverse)", "이미 정렬됨 (Sorted)"])
 selected_alg = st.sidebar.selectbox("알고리즘 선택", ["버블 정렬", "선택 정렬", "삽입 정렬"])
+anim_speed = st.sidebar.slider("자동 재생 속도 (초)", 0.05, 0.5, 0.1, 0.05)
 
 if st.sidebar.button("🔄 데이터 생성 및 준비"):
     if data_state == "무작위 (Random)":
@@ -131,33 +133,27 @@ if st.sidebar.button("🔄 데이터 생성 및 준비"):
     st.session_state.steps = generate_steps(st.session_state.data, selected_alg)
     end_time = time.perf_counter()
     
-    calc_time_ms = (end_time - start_time) * 1000  # ms 단위
+    st.session_state.calc_time_ms = (end_time - start_time) * 1000
     st.session_state.step_idx = 0
-    
-    # 대시보드에 기록 추가
-    final_step = st.session_state.steps[-1]
-    st.session_state.history.append({
-        "알고리즘": selected_alg,
-        "데이터 조건": data_state,
-        "데이터 크기(N)": data_size,
-        "총 비교 횟수": final_step["comp"],
-        "총 교환 횟수": final_step["swap"],
-        "순수 연산 시간": f"{calc_time_ms:.4f} ms"
-    })
+    st.rerun()
 
 # ---------------------------------------------------------
 # 4. 메인 화면: 2컬럼 레이아웃 (시각화 + 파이썬 코드)
 # ---------------------------------------------------------
 if not st.session_state.steps:
+    start_time = time.perf_counter()
     st.session_state.steps = generate_steps(st.session_state.data, selected_alg)
+    end_time = time.perf_counter()
+    st.session_state.calc_time_ms = (end_time - start_time) * 1000
 
 col_vis, col_code = st.columns([3, 2])
 
 with col_vis:
     st.subheader(f"📌 {selected_alg} 시뮬레이션")
     
-    # 수동 / 자동 컨트롤 버튼
+    # 조작 버튼 그룹
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns(4)
+    
     if ctrl_col1.button("◀ 이전 단계"):
         if st.session_state.step_idx > 0:
             st.session_state.step_idx -= 1
@@ -166,23 +162,39 @@ with col_vis:
         if st.session_state.step_idx < len(st.session_state.steps) - 1:
             st.session_state.step_idx += 1
             
-    if ctrl_col3.button("🔄 처음부터"):
+    if ctrl_col3.button("🔄 처음으로"):
         st.session_state.step_idx = 0
         
-    auto_play = ctrl_col4.checkbox("▶️ 자동 재생")
-    
-    # 자동 재생 처리
-    if auto_play:
+    play_all = ctrl_col4.button("▶️ 끝까지 자동 재생", type="primary")
+
+    # [수정 1] 끝까지 자동 재생 로직
+    if play_all:
+        progress_bar = st.progress(0)
+        chart_placeholder = st.empty()
+        info_placeholder = st.empty()
+        
         for idx in range(st.session_state.step_idx, len(st.session_state.steps)):
             st.session_state.step_idx = idx
-            time.sleep(0.2)
-            st.rerun()
+            step_data = st.session_state.steps[idx]
+            
+            # 실시간 차트 업데이트
+            df_play = pd.DataFrame({
+                "인덱스": [str(i) for i in range(len(step_data["arr"]))],
+                "값": step_data["arr"]
+            })
+            chart_placeholder.bar_chart(df_play, x="인덱스", y="값", height=280)
+            info_placeholder.info(f"**Step {idx} / {len(st.session_state.steps)-1}:** {step_data['msg']}")
+            progress_bar.progress((idx + 1) / len(st.session_state.steps))
+            
+            time.sleep(anim_speed)
+        st.rerun()
 
     # 현재 단계 정보 표시
     curr_step = st.session_state.steps[st.session_state.step_idx]
+    max_step = len(st.session_state.steps) - 1
     
     st.progress((st.session_state.step_idx + 1) / len(st.session_state.steps))
-    st.info(f"**Step {st.session_state.step_idx} / {len(st.session_state.steps)-1}:** {curr_step['msg']}")
+    st.info(f"**Step {st.session_state.step_idx} / {max_step}:** {curr_step['msg']}")
 
     # 막대 차트 시각화
     df_chart = pd.DataFrame({
@@ -195,6 +207,27 @@ with col_vis:
     m1.metric("현재 비교 횟수", f"{curr_step['comp']} 회")
     m2.metric("현재 교환 횟수", f"{curr_step['swap']} 회")
 
+    # [수정 2] 정렬 완주시 선택적 데이터 기록 버튼
+    st.divider()
+    if st.session_state.step_idx == max_step:
+        st.success("🎉 정렬 과정을 모두 마쳤습니다! 아래 버튼을 눌러 대시보드에 결과를 기록할 수 있습니다.")
+        if st.button("📊 현재 정렬 결과를 대시보드에 기록하기"):
+            # 기록 중복 방지 체크
+            new_record = {
+                "알고리즘": selected_alg,
+                "데이터 조건": data_state,
+                "데이터 크기(N)": data_size,
+                "총 비교 횟수": curr_step["comp"],
+                "총 교환 횟수": curr_step["swap"],
+                "순수 연산 시간": f"{st.session_state.calc_time_ms:.4f} ms"
+            }
+            st.session_state.history.append(new_record)
+            st.toast("대시보드에 결과가 성공적으로 추가되었습니다!", icon="✅")
+            time.sleep(0.5)
+            st.rerun()
+    else:
+        st.caption("💡 **안내:** 정렬을 끝까지 마무리하면 대시보드 기록 버튼이 활성화됩니다.")
+
 with col_code:
     st.subheader("💻 알고리즘 파이썬 코드")
     st.code(PYTHON_CODES[selected_alg], language="python")
@@ -203,10 +236,10 @@ with col_code:
 st.divider()
 
 # ---------------------------------------------------------
-# 5. 성능 비교 대시보드 (자동 기록)
+# 5. 성능 비교 대시보드
 # ---------------------------------------------------------
 st.header("📈 알고리즘 성능 비교 대시보드")
-st.caption("학생들이 실험한 조건, 연산 횟수, 순수 연산 시간이 자동으로 기록됩니다.")
+st.caption("학생이 정렬을 마치고 스스로 기록한 결과들이 저장되는 대시보드입니다.")
 
 if st.session_state.history:
     df_history = pd.DataFrame(st.session_state.history)
@@ -216,23 +249,18 @@ if st.session_state.history:
         st.session_state.history = []
         st.rerun()
 else:
-    st.write("사이드바에서 **[🔄 데이터 생성 및 준비]** 버튼을 눌러 실험 기록을 적재해 보세요.")
+    st.info("아직 대시보드에 기록된 실험 결과가 없습니다. 정렬을 끝까지 감상한 후 기록해 보세요!")
 
 st.divider()
 
-
-
-# ... (기존 코드 생략) ...
-
 # ---------------------------------------------------------
-# 6. 개념 기반 탐구 답안 제출 (구글 시트 자동 연동)
+# 6. 개념 기반 탐구 답안 제출 (Google Apps Script 연동)
 # ---------------------------------------------------------
 st.header("📝 탐구 활동지 답안 제출")
 
-# 교사의 구글 앱스크립트 Webhook URL (상수로 고정해두면 학생이 입력할 필요 없음)
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbywfT48ROSymzL9u-j71dVy8M5tfIWpq4woNN5-G8jUARjGd-NuNh52jnyu5rUzkwjVUw/exec" # 👈 3단계에서 복사한 URL 입력
-with st.form(key="student_form_unique_key"):  # key 파라미터 명시적 지정
-#with st.form("student_form"):
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec"
+
+with st.form(key="student_answer_form"):
     student_info = st.text_input("학번 및 이름 (예: 20101 홍길동)")
     q1 = st.text_area("1. [Fact] 선택한 알고리즘에서 데이터가 '완전 역순'일 때 비교 횟수와 교환 횟수의 특징은 무엇인가요?")
     q2 = st.text_area("2. [Concept] '이미 정렬된 데이터'에서 가장 빠른 효율을 보인 알고리즘과 그 이유를 설명하세요.")
@@ -244,13 +272,11 @@ with st.form(key="student_form_unique_key"):  # key 파라미터 명시적 지�
         if not student_info:
             st.error("학번과 이름을 꼭 입력해 주세요!")
         else:
-            # 대시보드 마지막 실험 결과 추출 (없을 경우 기본값)
             last_history = st.session_state.history[-1] if st.session_state.history else {}
             
-            # 구글 시트로 전송할 데이터 패키징
             payload = {
                 "student_info": student_info,
-                "algorithm": last_history.get("알고리즘", "실험 기록 없음"),
+                "algorithm": last_history.get("알고리즘", "기록 없음"),
                 "data_state": last_history.get("데이터 조건", "-"),
                 "data_size": last_history.get("데이터 크기(N)", "-"),
                 "comp_count": last_history.get("총 비교 횟수", 0),
@@ -262,10 +288,9 @@ with st.form(key="student_form_unique_key"):  # key 파라미터 명시적 지�
             }
             
             try:
-                # 구글 앱스크립트로 데이터 POST 전송
                 response = requests.post(GAS_WEBHOOK_URL, json=payload, timeout=5)
                 if response.status_code == 200:
-                    st.success(f"🎉 {student_info} 학생의 탐구 답안과 실험 대시보드가 구글 시트로 전송되었습니다!")
+                    st.success(f"🎉 {student_info} 학생의 답안이 구글 시트로 성공적으로 제출되었습니다!")
                     st.balloons()
                 else:
                     st.error("구글 시트 전송 중 오류가 발생했습니다.")
