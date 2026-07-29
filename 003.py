@@ -56,7 +56,8 @@ def generate_steps(arr, alg_type):
                 comparisons += 1
                 if a[j] < a[min_idx]:
                     min_idx = j
-                steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [i, j, min_idx], "msg": f"최소값 탐색 중 (현재 최소값: 인덱스 {min_idx})" fill_color: "#FF4B4B"})
+                steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [i, j, min_idx], "msg": f"최소값 탐색 중 (현재 최소값: 인덱스 {min_idx})"})
+                
             if min_idx != i:
                 a[i], a[min_idx] = a[min_idx], a[i]
                 swaps += 1
