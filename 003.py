@@ -254,7 +254,7 @@ with st.form("student_form"):
 st.header("📝 탐구 활동지 답안 제출")
 
 # 교사의 구글 앱스크립트 Webhook URL (상수로 고정해두면 학생이 입력할 필요 없음)
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec" # 👈 3단계에서 복사한 URL 입력
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbywfT48ROSymzL9u-j71dVy8M5tfIWpq4woNN5-G8jUARjGd-NuNh52jnyu5rUzkwjVUw/exec" # 👈 3단계에서 복사한 URL 입력
 
 with st.form("student_form"):
     student_info = st.text_input("학번 및 이름 (예: 20101 홍길동)")
