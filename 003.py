@@ -3,6 +3,7 @@ import random
 import time
 import pandas as pd
 import requests
+import altair as alt  # 🎨 막대 색상 지정을 위해 altair 사용
 
 st.set_page_config(page_title="정렬 알고리즘 탐구 대시보드", layout="wide")
 
@@ -24,7 +25,7 @@ if "calc_time_ms" not in st.session_state:
     st.session_state.calc_time_ms = 0.0
 
 # ---------------------------------------------------------
-# 2. 정렬 알고리즘 및 단계(Step) 제너레이터
+# 2. 정렬 알고리즘 및 단계(Step) 제너레이터 (하이라이트 인덱스 포함)
 # ---------------------------------------------------------
 def generate_steps(arr, alg_type):
     a = arr.copy()
@@ -45,6 +46,7 @@ def generate_steps(arr, alg_type):
                     a[j], a[j + 1] = a[j + 1], a[j]
                     swaps += 1
                     msg += " ➔ [교환 발생!]"
+                # 현재 비교/교환 중인 두 인덱스를 highlight 배열에 담음
                 steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [j, j + 1], "msg": msg})
                 
     elif alg_type == "선택 정렬":
@@ -54,7 +56,7 @@ def generate_steps(arr, alg_type):
                 comparisons += 1
                 if a[j] < a[min_idx]:
                     min_idx = j
-                steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [i, j], "msg": f"최소값 탐색 중 (현재 최소: {a[min_idx]})"})
+                steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [i, j, min_idx], "msg": f"최소값 탐색 중 (현재 최소값: 인덱스 {min_idx})" fill_color: "#FF4B4B"})
             if min_idx != i:
                 a[i], a[min_idx] = a[min_idx], a[i]
                 swaps += 1
@@ -71,11 +73,11 @@ def generate_steps(arr, alg_type):
                     a[j + 1] = a[j]
                     swaps += 1
                     j -= 1
-                    steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [j + 1], "msg": f"{a[j+1]}를 오른쪽으로 이동"})
+                    steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [j + 1, i], "msg": f"{a[j+1]}를 오른쪽으로 이동"})
                 else:
                     break
             a[j + 1] = key
-            steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [j + 1], "msg": f"Key({key}) 삽입 완료"})
+            steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [j + 1], "msg": f"Key({key}) 위치 삽입 완료"})
 
     steps.append({"arr": a.copy(), "comp": comparisons, "swap": swaps, "highlight": [], "msg": "🎉 정렬이 완료되었습니다!"})
     return steps
@@ -111,6 +113,42 @@ PYTHON_CODES = {
     return arr'''
 }
 
+# 🎨 색상 차트 생성 함수 (Altair 활용)
+def render_colored_chart(step_data):
+    arr = step_data["arr"]
+    highlight = step_data.get("highlight", [])
+    
+    # 상태별 색상 데이터 생성
+    colors = []
+    for idx in range(len(arr)):
+        if idx in highlight:
+            colors.append("비교/교환 중 🔴")
+        else:
+            colors.append("일반 데이터 🔵")
+            
+    df = pd.DataFrame({
+        "인덱스": [f"[{i}]" for i in range(len(arr))],
+        "값": arr,
+        "상태": colors
+    })
+    
+    # Altair 커스텀 막대 차트
+    chart = alt.Chart(df).mark_bar(size=25).encode(
+        x=alt.X("인덱스:N", sort=None, axis=alt.Axis(title="데이터 인덱스", labelAngle=0)),
+        y=alt.Y("값:Q", axis=alt.Axis(title="값")),
+        color=alt.Color(
+            "상태:N",
+            scale=alt.Scale(
+                domain=["일반 데이터 🔵", "비교/교환 중 🔴"],
+                range=["#4A90E2", "#FF4B4B"]  # 파란색, 빨간색
+            ),
+            legend=alt.Legend(title="구분")
+        ),
+        tooltip=["인덱스", "값", "상태"]
+    ).properties(height=300)
+    
+    return chart
+
 # ---------------------------------------------------------
 # 3. 사이드바: 설정 영역
 # ---------------------------------------------------------
@@ -128,7 +166,6 @@ if st.sidebar.button("🔄 데이터 생성 및 준비"):
     else:
         st.session_state.data = list(range(5, data_size * 5 + 1, 5))
     
-    # 순수 연산시간 측정 (UI 대기시간 제외)
     start_time = time.perf_counter()
     st.session_state.steps = generate_steps(st.session_state.data, selected_alg)
     end_time = time.perf_counter()
@@ -167,7 +204,7 @@ with col_vis:
         
     play_all = ctrl_col4.button("▶️ 끝까지 자동 재생", type="primary")
 
-    # [수정 1] 끝까지 자동 재생 로직
+    # 끝까지 자동 재생 로직 (색상 하이라이트 반영)
     if play_all:
         progress_bar = st.progress(0)
         chart_placeholder = st.empty()
@@ -177,42 +214,34 @@ with col_vis:
             st.session_state.step_idx = idx
             step_data = st.session_state.steps[idx]
             
-            # 실시간 차트 업데이트
-            df_play = pd.DataFrame({
-                "인덱스": [str(i) for i in range(len(step_data["arr"]))],
-                "값": step_data["arr"]
-            })
-            chart_placeholder.bar_chart(df_play, x="인덱스", y="값", height=280)
+            # 커스텀 색상 차트 실시간 렌더링
+            chart = render_colored_chart(step_data)
+            chart_placeholder.altair_chart(chart, use_container_width=True)
             info_placeholder.info(f"**Step {idx} / {len(st.session_state.steps)-1}:** {step_data['msg']}")
             progress_bar.progress((idx + 1) / len(st.session_state.steps))
             
             time.sleep(anim_speed)
         st.rerun()
 
-    # 현재 단계 정보 표시
+    # 현재 단계 정보 및 시각화 표시
     curr_step = st.session_state.steps[st.session_state.step_idx]
     max_step = len(st.session_state.steps) - 1
     
     st.progress((st.session_state.step_idx + 1) / len(st.session_state.steps))
     st.info(f"**Step {st.session_state.step_idx} / {max_step}:** {curr_step['msg']}")
 
-    # 막대 차트 시각화
-    df_chart = pd.DataFrame({
-        "인덱스": [str(i) for i in range(len(curr_step["arr"]))],
-        "값": curr_step["arr"]
-    })
-    st.bar_chart(df_chart, x="인덱스", y="값", height=280)
+    # 🎨 색상이 반영된 막대 차트 출력
+    st.altair_chart(render_colored_chart(curr_step), use_container_width=True)
     
     m1, m2 = st.columns(2)
     m1.metric("현재 비교 횟수", f"{curr_step['comp']} 회")
     m2.metric("현재 교환 횟수", f"{curr_step['swap']} 회")
 
-    # [수정 2] 정렬 완주시 선택적 데이터 기록 버튼
+    # 정렬 완주시 선택적 데이터 기록 버튼
     st.divider()
     if st.session_state.step_idx == max_step:
         st.success("🎉 정렬 과정을 모두 마쳤습니다! 아래 버튼을 눌러 대시보드에 결과를 기록할 수 있습니다.")
         if st.button("📊 현재 정렬 결과를 대시보드에 기록하기"):
-            # 기록 중복 방지 체크
             new_record = {
                 "알고리즘": selected_alg,
                 "데이터 조건": data_state,
