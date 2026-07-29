@@ -288,7 +288,7 @@ st.divider()
 # ---------------------------------------------------------
 st.header("📝 탐구 활동지 답안 제출")
 
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbywfT48ROSymzL9u-j71dVy8M5tfIWpq4woNN5-G8jUARjGd-NuNh52jnyu5rUzkwjVUw/exec"
 
 with st.form(key="student_answer_form"):
     student_info = st.text_input("학번 및 이름 (예: 20101 홍길동)")
