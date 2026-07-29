@@ -220,30 +220,6 @@ else:
 
 st.divider()
 
-# ---------------------------------------------------------
-# 6. 개념 기반 탐구 답안 제출 (외부 저장소 연동 가능)
-# ---------------------------------------------------------
-st.header("📝 탐구 활동지 답안 제출")
-
-with st.form("student_form"):
-    student_info = st.text_input("학번 및 이름 (예: 20101 홍길동)")
-    q1 = st.text_area("1. [Fact] 선택한 알고리즘에서 데이터가 '완전 역순'일 때 비교 횟수와 교환 횟수의 특징은 무엇인가요?")
-    q2 = st.text_area("2. [Concept] '이미 정렬된 데이터'에서 가장 빠른 효율을 보인 알고리즘과 그 이유를 설명하세요.")
-    q3 = st.text_area("3. [Debatable] 실행 속도가 다소 느리더라도 코드가 단순한 알고리즘이 더 우수하다고 볼 수 있는 상황은 언제일까요?")
-    
-    # 구글 시트 웹앱 URL 입력 칸 (교사가 부여하는 Web App AppScript URL)
-    webhook_url = st.text_input("교사 제출용 API URL (기본값 제공 시 생략 가능)", value="", type="password")
-    
-    submitted = st.form_submit_button("🚀 답안 구글 시트로 제출하기")
-    
-    if submitted:
-        if not student_info:
-            st.error("학번과 이름을 입력해주세요.")
-        else:
-            # 여기에 Google Apps Script로 requests.post 전송 로직 추가 가능
-            st.success(f"✅ {student_info} 학생의 답안과 실험 대시보드 기록이 교사의 구글 시트로 성공적으로 제출되었습니다!")
-
-
 
 
 # ... (기존 코드 생략) ...
