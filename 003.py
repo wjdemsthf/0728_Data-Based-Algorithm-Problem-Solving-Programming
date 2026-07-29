@@ -255,8 +255,8 @@ st.header("📝 탐구 활동지 답안 제출")
 
 # 교사의 구글 앱스크립트 Webhook URL (상수로 고정해두면 학생이 입력할 필요 없음)
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbywfT48ROSymzL9u-j71dVy8M5tfIWpq4woNN5-G8jUARjGd-NuNh52jnyu5rUzkwjVUw/exec" # 👈 3단계에서 복사한 URL 입력
-
-with st.form("student_form"):
+with st.form(key="student_form_unique_key"):  # key 파라미터 명시적 지정
+#with st.form("student_form"):
     student_info = st.text_input("학번 및 이름 (예: 20101 홍길동)")
     q1 = st.text_area("1. [Fact] 선택한 알고리즘에서 데이터가 '완전 역순'일 때 비교 횟수와 교환 횟수의 특징은 무엇인가요?")
     q2 = st.text_area("2. [Concept] '이미 정렬된 데이터'에서 가장 빠른 효율을 보인 알고리즘과 그 이유를 설명하세요.")
